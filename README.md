@@ -1,181 +1,380 @@
-# Graphite-Memory
+<div align="center">
 
-A high-performance cognitive middleware for LLM personalization, built in Go. Connects to Gemini and ChatGPT via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
+<br>
 
-## What It Does
+```
+ ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██╗████████╗███████╗
+██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██║╚══██╔══╝██╔════╝
+██║  ███╗██████╔╝███████║██████╔╝███████║██║   ██║   █████╗
+██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║   ██║   ██╔══╝
+╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██║   ██║   ███████╗
+ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝   ╚═╝   ╚══════╝
+                    M E M O R Y
+```
 
-Standard LLM memory (RAG) is flat -- it treats every past interaction with equal importance and often gets stuck in semantic loops. Graphite-Memory solves this with:
+**Cognitive middleware that gives LLMs a real memory — not just retrieval.**
 
-- **Hybrid Graph-Vector Architecture** -- ChromaDB for *what* you said, Neo4j for *why* you said it
-- **Temporal Decay** -- recent memories outrank stale ones via `Score = Similarity × e^(-λΔt)`
-- **Frequency Suppression** -- prevents the "broken record" problem by cooling down overused facts
-- **Scoped Multi-Tenant Memory** -- memories siloed into scopes (e.g., `/projects/architect-cli`, `/personal/learning`)
-- **Context Virtualization** -- "private browsing" mode for AI that blocks all past memories without deleting them
-- **Negative Memory Weighting** -- temporarily suppress topics ("forget the C++ stuff for now")
+*Graph + Vector hybrid architecture · Temporal decay · Scoped multi-tenancy · MCP native*
+
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-8B5CF6?style=flat-square)](https://modelcontextprotocol.io)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5-4581C3?style=flat-square&logo=neo4j&logoColor=white)](https://neo4j.com)
+[![ChromaDB](https://img.shields.io/badge/Chroma-DB-FF6F61?style=flat-square)](https://www.trychroma.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
+<br>
+
+---
+
+</div>
+
+## The Problem
+
+Standard LLM memory is flat. Every RAG system treats past interactions with equal importance, returns the same facts over and over, and has zero awareness of *why* something was said — only *what* was said.
+
+Your AI remembers everything. It understands nothing.
+
+## The Fix
+
+Graphite-Memory is a **Model Context Protocol server** written in Go that replaces naive retrieval with a hybrid cognitive layer:
+
+| Capability | What it solves |
+|:---|:---|
+| **Graph + Vector Fusion** | ChromaDB finds *what* is similar. Neo4j finds *why* it matters — intent, goals, relationships between ideas. Dual hits get a **1.5× score boost**. |
+| **Temporal Decay** | Recent memories outrank stale ones. Score decays via `e^(−λΔt)` with a configurable half-life (~3 days default). |
+| **Frequency Suppression** | Stops the "broken record" problem. After a memory is injected N times in a session, it cools down for K turns. |
+| **Scoped Memory** | Memories are siloed into paths — `/projects/architect-cli`, `/personal/learning`. Mount and unmount scopes per session. Zero cross-contamination. |
+| **Context Virtualization** | "Private browsing" for AI. Start an inhibited session — all past memories are blocked, nothing is deleted. |
+| **Negative Weighting** | Temporarily suppress topics: *"forget the C++ stuff for now"*. Suppressed terms decay per-turn via TTL. |
+
+<br>
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                    LLM Clients                       │
-│              (Gemini / ChatGPT / Claude)             │
-└─────────────────┬────────────────────────────────────┘
-                  │ MCP (stdio / HTTP)
-┌─────────────────▼────────────────────────────────────┐
-│              MCP Server (Go)                         │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │            10 MCP Tools                         │ │
-│  │  ingest_memory · recall_memory · forget_memory  │ │
-│  │  suppress_topic · new_session                   │ │
-│  │  mount_scope · unmount_scope · list_scopes      │ │
-│  │  memory_status                                  │ │
-│  └──────────┬──────────────────────────────────────┘ │
-│  ┌──────────▼──────────────────────────────────────┐ │
-│  │          Memory Vault                           │ │
-│  │  Session Manager · Scope Registry               │ │
-│  │  Negative Weighting · Inhibit Toggle            │ │
-│  └──────────┬──────────────────────────────────────┘ │
-│  ┌──────────▼──────────────────────────────────────┐ │
-│  │          Governor (Core Engine)                  │ │
-│  │  Parallel Retrieval (goroutines)                │ │
-│  │  Temporal Decay · Frequency Suppression         │ │
-│  └──────┬───────────────────┬──────────────────────┘ │
-│         │                   │                        │
-│  ┌──────▼──────┐    ┌──────▼──────┐                  │
-│  │  ChromaDB   │    │   Neo4j     │                  │
-│  │  (Vectors)  │    │   (Graph)   │                  │
-│  └─────────────┘    └─────────────┘                  │
-│                                                      │
-│  ┌─────────────────────────────────────────────────┐ │
-│  │  Ollama (Llama 3.1) -- Triple Extraction + Embed│ │
-│  └─────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────┘
+                    ┌─────────────────────────┐
+                    │      LLM  Clients       │
+                    │  Gemini · ChatGPT · Claude│
+                    └───────────┬─────────────┘
+                                │
+                          MCP (stdio / HTTP)
+                                │
+┌───────────────────────────────▼──────────────────────────────────┐
+│                                                                  │
+│   ┌────────────────────────────────────────────────────────────┐ │
+│   │                      MCP  TOOLS                            │ │
+│   │                                                            │ │
+│   │  ingest_memory    recall_memory     forget_memory          │ │
+│   │  suppress_topic   new_session       memory_status          │ │
+│   │  mount_scope      unmount_scope     list_scopes            │ │
+│   └──────────────┬──────────────────────┬──────────────────────┘ │
+│                  │                      │                        │
+│   ┌──────────────▼──────┐  ┌────────────▼───────────────┐       │
+│   │    MEMORY  VAULT    │  │        GOVERNOR             │       │
+│   │                     │  │                             │       │
+│   │  Session Manager    │  │  Parallel Retrieval (WG)    │       │
+│   │  Scope Registry     │  │  Temporal Decay  e^(−λt)    │       │
+│   │  Inhibit Toggle     │  │  Frequency Suppressor       │       │
+│   │  Negative Weights   │  │  Graph Boost  (×1.5)        │       │
+│   └─────────────────────┘  └──────┬──────────┬──────────┘       │
+│                                   │          │                   │
+│                          ┌────────▼──┐  ┌────▼────────┐         │
+│                          │ ChromaDB  │  │   Neo4j     │         │
+│                          │ (Vectors) │  │   (Graph)   │         │
+│                          └───────────┘  └─────────────┘         │
+│                                                                  │
+│   ┌────────────────────────────────────────────────────────────┐ │
+│   │         Ollama  (Llama 3.1)                                │ │
+│   │         Triple Extraction  ·  Embedding Generation         │ │
+│   └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│                        GRAPHITE-MEMORY  SERVER                   │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+<br>
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.22+
-- Docker & Docker Compose
-- [Ollama](https://ollama.ai) with `llama3.1` model
+- **Go 1.22+**
+- **Docker & Docker Compose** (for Neo4j + ChromaDB)
+- **[Ollama](https://ollama.ai)** with `llama3.1` pulled
 
-### Setup
+### 1. Clone & Boot Infrastructure
 
 ```bash
-# Clone
 git clone https://github.com/mishrak5j/graphite-mem.git
 cd graphite-mem
 
-# Start Neo4j + ChromaDB
+# Spin up Neo4j + ChromaDB
 make docker-up
 
-# Pull the Ollama model
+# Pull the embedding / extraction model
 ollama pull llama3.1
+```
 
-# Build and run (stdio mode)
+### 2. Build & Run
+
+```bash
+# Build the binary
 make build
+
+# Run in stdio mode (default — pipe from your MCP client)
 ./bin/graphite-mem
 
-# Or run in HTTP mode
+# Or run in HTTP/SSE mode on port 3100
 GRAPHITE_TRANSPORT=sse GRAPHITE_SSE_ADDR=:3100 ./bin/graphite-mem
 ```
 
-### Run Tests
+### 3. Verify
 
 ```bash
-make test
+make test        # go test ./... -v -race
+make lint        # go vet
 ```
 
-## MCP Tools
+<br>
+
+## Data Flow
+
+### Ingest Path
+
+```
+text + scope
+     │
+     ▼
+┌──────────┐     ┌──────────────────────┐
+│  Ollama  │────▶│  Extract Triples     │──── (subject, predicate, object)
+│          │     │  Generate Embedding   │──── float64 vector
+└──────────┘     └──────────────────────┘
+                          │
+               ┌──────────┴──────────┐
+               ▼                     ▼
+        ┌─────────────┐      ┌─────────────┐
+        │  ChromaDB   │      │   Neo4j     │
+        │  store doc  │      │  MERGE rels │
+        └─────────────┘      └─────────────┘
+            (parallel — two goroutines, error channel)
+```
+
+### Recall Path
+
+```
+query + intent + scope filter
+     │
+     ▼
+  Embed query
+     │
+     ├───── goroutine ──▶  ChromaDB vector search (oversampled 2×)
+     │
+     ├───── goroutine ──▶  Neo4j graph traversal (intent or related)
+     │
+     ▼  (sync.WaitGroup)
+  Merge results ──▶ Graph boost (1.5×) on dual hits
+     │
+     ▼
+  Temporal decay ──▶ score × e^(−λ × hours)
+     │
+     ▼
+  Frequency suppression ──▶ skip if over-injected this session
+     │
+     ▼
+  Negative weights ──▶ multiply by suppression weight, drop if ≤ 0.001
+     │
+     ▼
+  Sort · Trim to top_k · Record injection counts
+```
+
+<br>
+
+## MCP Tool Reference
 
 ### `ingest_memory`
-Store a memory with automatic triple extraction and scope tagging.
+Store a memory. Triples are extracted automatically; embedding is generated and stored.
+
 ```json
-{"text": "I'm building a CLI tool in Go called Architect", "scope": "/projects/architect-cli"}
+{
+  "text": "I'm building a CLI tool in Go called Architect",
+  "scope": "/projects/architect-cli",
+  "metadata": {}
+}
 ```
+Returns: `memory_id`, `scope`, `triples_extracted`
+
+---
 
 ### `recall_memory`
-Retrieve relevant memories with hybrid search, temporal decay, and scope filtering.
+Hybrid retrieval with all ranking stages applied.
+
 ```json
-{"query": "CLI tools", "top_k": 5, "cross_scope": false}
+{
+  "query": "CLI tools I've been working on",
+  "intent": "find active projects",
+  "top_k": 5,
+  "cross_scope": false
+}
 ```
+Returns: ranked memories with scores, or `inhibited: true` if session is in clean-slate mode.
+
+---
 
 ### `new_session`
-Create a fresh session. Use `inhibit: true` for clean-slate mode.
+Start a new session. Optionally inhibit all past context or pre-mount scopes.
+
 ```json
-{"inhibit": true}
+{ "inhibit": true, "mount_scopes": ["/projects/architect-cli"] }
 ```
 
-### `mount_scope` / `unmount_scope`
-Control which memory scopes are visible in the current session.
-```json
-{"scope_path": "/projects/architect-cli"}
-```
+---
 
 ### `suppress_topic`
-Temporarily suppress a topic from recall results.
+Temporarily suppress a topic from recall. Decays each turn.
+
 ```json
-{"term": "C++", "ttl": 50, "weight": 0.0}
+{ "term": "C++", "ttl": 50, "weight": 0.0 }
 ```
+
+---
 
 ### `forget_memory`
-Permanently delete a memory from both stores.
+Permanent deletion from both vector and graph stores.
+
 ```json
-{"memory_id": "uuid-here"}
+{ "memory_id": "uuid-here" }
 ```
 
+---
+
+### `mount_scope` / `unmount_scope`
+Control scope visibility for the current session.
+
+```json
+{ "scope_path": "/projects/architect-cli" }
+```
+
+---
+
 ### `list_scopes`
-List all scopes with mount status and memory counts.
+Returns all scopes with mount status and memory counts.
 
 ### `memory_status`
-Full diagnostic: session state, mounted scopes, active suppressions, store stats.
+Full diagnostic — session state, mounted scopes, active suppressions, store statistics.
+
+<br>
+
+## MCP Resources
+
+| URI | Description |
+|:----|:------------|
+| `memory://profile` | Plain-text user memory profile — session ID, mounted scopes, and graph-derived relationship triples. |
+
+<br>
 
 ## Configuration
 
+All configuration is via environment variables with the `GRAPHITE_` prefix.
+
+<details>
+<summary><strong>Full variable reference</strong></summary>
+
+<br>
+
 | Variable | Default | Description |
-|---|---|---|
+|:---|:---|:---|
 | `GRAPHITE_TRANSPORT` | `stdio` | Transport mode: `stdio` or `sse` |
-| `GRAPHITE_SSE_ADDR` | `:3100` | HTTP listen address |
+| `GRAPHITE_SSE_ADDR` | `:3100` | HTTP listen address (SSE mode) |
 | `GRAPHITE_CHROMA_URL` | `http://localhost:8000` | ChromaDB endpoint |
-| `GRAPHITE_NEO4J_URI` | `bolt://localhost:7687` | Neo4j bolt URI |
+| `GRAPHITE_NEO4J_URI` | `bolt://localhost:7687` | Neo4j Bolt URI |
 | `GRAPHITE_NEO4J_USER` | `neo4j` | Neo4j username |
 | `GRAPHITE_NEO4J_PASS` | `graphite` | Neo4j password |
 | `GRAPHITE_OLLAMA_URL` | `http://localhost:11434` | Ollama endpoint |
-| `GRAPHITE_OLLAMA_MODEL` | `llama3.1` | Model for triple extraction and embedding |
+| `GRAPHITE_OLLAMA_MODEL` | `llama3.1` | Model for triple extraction + embedding |
 | `GRAPHITE_DECAY_LAMBDA` | `0.01` | Temporal decay rate (~3 day half-life) |
-| `GRAPHITE_SUPPRESS_THRESHOLD` | `3` | Inject count before frequency cooldown |
+| `GRAPHITE_SUPPRESS_THRESHOLD` | `3` | Injection count before frequency cooldown |
 | `GRAPHITE_SUPPRESS_COOLDOWN` | `5` | Turns to hide a frequently injected fact |
-| `GRAPHITE_DEFAULT_SCOPE` | `/default` | Default memory scope |
+| `GRAPHITE_DEFAULT_SCOPE` | `/default` | Default memory scope path |
 | `GRAPHITE_NEG_WEIGHT_DEFAULT_TTL` | `50` | Default suppression TTL in turns |
+
+</details>
+
+<br>
 
 ## Project Structure
 
 ```
 graphite-mem/
-├── cmd/graphite-mem/main.go       # Entry point, wiring, transport selection
+├── cmd/graphite-mem/
+│   └── main.go              # Wiring, transport selection, server bootstrap
 ├── internal/
-│   ├── vault/                     # Session management, scopes, negative weighting
-│   ├── governor/                  # Parallel retrieval, decay, frequency suppression
-│   ├── ingestor/                  # Triple extraction + dual-store ingest pipeline
-│   ├── storage/                   # ChromaDB + Neo4j drivers with scope filtering
-│   ├── llm/                       # Ollama HTTP client
-│   └── config/                    # Environment-based configuration
-├── tools/                         # 10 MCP tool definitions
-├── resources/                     # MCP resource: memory://profile
-├── scripts/                       # Docker Compose for Neo4j + ChromaDB
-├── Makefile
+│   ├── config/              # Env-based configuration loader
+│   ├── llm/                 # Ollama HTTP client (triples + embeddings)
+│   ├── ingestor/            # Parallel dual-store ingest pipeline
+│   ├── governor/            # Hybrid retrieval engine + all ranking stages
+│   ├── vault/               # Sessions, scopes, negative weights, inhibit
+│   └── storage/             # ChromaDB + Neo4j drivers with scope filtering
+├── tools/                   # MCP tool definitions (9 tools)
+├── resources/               # MCP resource: memory://profile
+├── scripts/
+│   ├── docker-compose.yml   # Neo4j 5 + ChromaDB containers
+│   └── seed.cypher          # Optional seed data
+├── Makefile                 # build · run · test · lint · docker-up/down/reset
 └── README.md
 ```
 
-## Key Technical Decisions
+<br>
 
-**Why Go?** Goroutines query vector and graph databases in parallel, merging results in <15ms. No GC pauses keeps time-to-first-token low.
+## Design Decisions
 
-**Why Hybrid Graph+Vector?** Vector search finds *what* is similar. Graph traversal finds *why* it matters (intent, goals, relationships).
+<table>
+<tr>
+<td width="30%"><strong>Why Go?</strong></td>
+<td>Goroutines make parallel vector + graph queries trivial. Recall merges both result sets in sub-15ms. No GC pauses keeps time-to-first-token low for the LLM client.</td>
+</tr>
+<tr>
+<td><strong>Why Graph + Vector?</strong></td>
+<td>Vector search is a proximity lookup — it finds <em>what</em> is similar. Graph traversal finds <em>why</em> it matters: intent chains, project relationships, goal hierarchies. Combining them produces recall that feels like understanding.</td>
+</tr>
+<tr>
+<td><strong>Why Scoped Memory?</strong></td>
+<td>Flat memory pollutes. Asking about your Go CLI shouldn't surface your Python ML notes. Scopes are path-based (<code>/projects/foo</code>) and mount/unmount instantly — no re-indexing, no copying.</td>
+</tr>
+<tr>
+<td><strong>Why Frequency Suppression?</strong></td>
+<td>Without it, the same high-similarity memory gets injected every turn. The suppressor tracks injection counts per session and applies a cooldown window — the memory comes back after K turns, not gone forever.</td>
+</tr>
+<tr>
+<td><strong>Why Negative Weights?</strong></td>
+<td>Sometimes you need the AI to <em>not</em> bring something up. Negative weights apply a score multiplier (down to 0) on substring-matched terms, with TTL-based decay so they expire naturally.</td>
+</tr>
+</table>
 
-**Why Scoped Memory?** Multi-tenant scoping prevents context pollution between projects and enables instant "context swap" by mounting different scopes.
+<br>
 
-## License
+## Makefile
 
-MIT
+```bash
+make build          # → bin/graphite-mem
+make run            # stdio mode
+make run-sse        # HTTP/SSE mode on :3100
+make test           # go test ./... -v -race
+make lint           # go vet ./...
+make docker-up      # start Neo4j + ChromaDB
+make docker-down    # stop containers
+make docker-reset   # nuke volumes and restart
+make tidy           # go mod tidy
+make clean          # rm -rf bin/
+```
+
+<br>
+
+<div align="center">
+
+---
+
+**Built with Go, powered by graphs and vectors.**
+
+MIT License
+
+</div>
