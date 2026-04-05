@@ -162,10 +162,11 @@ func mergeResults(vectorResults []storage.ScoredMemory, graphResults []storage.R
 			existing.score *= 1.5
 		} else {
 			byID[gr.MemoryID] = &candidate{
-				id:    gr.MemoryID,
-				text:  gr.Text,
-				scope: gr.Scope,
-				score: gr.Score,
+				id:        gr.MemoryID,
+				text:      gr.Text,
+				scope:     gr.Scope,
+				score:     gr.Score,
+				createdAt: gr.CreatedAt,
 			}
 		}
 	}
