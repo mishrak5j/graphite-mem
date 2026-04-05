@@ -2,6 +2,7 @@ package ingestor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -63,16 +64,17 @@ func (ing *Ingestor) Ingest(ctx context.Context, text, scope string, metadata ma
 		errCh <- ing.graph.MergeTriples(ctx, memoryID, scope, storageTriples)
 	}()
 
+	var errs []error
 	for i := 0; i < 2; i++ {
 		if e := <-errCh; e != nil {
-			if err == nil {
-				err = e
-			}
+			errs = append(errs, e)
 		}
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("store memory: %w", err)
+	if len(errs) > 0 {
+		_ = ing.vector.Delete(ctx, memoryID)
+		_ = ing.graph.Delete(ctx, memoryID)
+		return nil, fmt.Errorf("store memory: %w", errors.Join(errs...))
 	}
 
 	return &IngestResult{
