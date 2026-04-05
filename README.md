@@ -1,26 +1,20 @@
 <div align="center">
 
+<a href="https://github.com/mishrak5j/graphite-mem">
+  <img src="resources/readme-banner.svg" alt="Graphite Memory — hybrid graph and vector memory for LLMs via MCP" width="100%" />
+</a>
+
+**Memory that behaves like memory — not a flat vector dump.**
+
+<sub>Temporal decay · Scoped tenants · Graph + vector fusion · MCP-native tools</sub>
+
 <br>
 
-```
- ██████╗ ██████╗  █████╗ ██████╗ ██╗  ██╗██╗████████╗███████╗
-██╔════╝ ██╔══██╗██╔══██╗██╔══██╗██║  ██║██║╚══██╔══╝██╔════╝
-██║  ███╗██████╔╝███████║██████╔╝███████║██║   ██║   █████╗
-██║   ██║██╔══██╗██╔══██║██╔═══╝ ██╔══██║██║   ██║   ██╔══╝
-╚██████╔╝██║  ██║██║  ██║██║     ██║  ██║██║   ██║   ███████╗
- ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝   ╚═╝   ╚══════╝
-                    M E M O R Y
-```
-
-**Cognitive middleware that gives LLMs a real memory — not just retrieval.**
-
-*Graph + Vector hybrid architecture · Temporal decay · Scoped multi-tenancy · MCP native*
-
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-8B5CF6?style=flat-square)](https://modelcontextprotocol.io)
-[![Neo4j](https://img.shields.io/badge/Neo4j-5-4581C3?style=flat-square&logo=neo4j&logoColor=white)](https://neo4j.com)
-[![ChromaDB](https://img.shields.io/badge/Chroma-DB-FF6F61?style=flat-square)](https://www.trychroma.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
+[![MCP](https://img.shields.io/badge/MCP-Server-8B5CF6?style=for-the-badge)](https://modelcontextprotocol.io)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5-4581C3?style=for-the-badge&logo=neo4j&logoColor=white)](https://neo4j.com)
+[![Chroma](https://img.shields.io/badge/Chroma-DB-FF6F61?style=for-the-badge)](https://www.trychroma.com)
+[![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
 
 <br>
 
@@ -41,7 +35,7 @@ Graphite-Memory is a **Model Context Protocol server** written in Go that replac
 | Capability | What it solves |
 |:---|:---|
 | **Graph + Vector Fusion** | ChromaDB finds *what* is similar. Neo4j finds *why* it matters — intent, goals, relationships between ideas. Dual hits get a **1.5× score boost**. |
-| **Temporal Decay** | Recent memories outrank stale ones. Score decays via `e^(−λΔt)` with a configurable half-life (~3 days default). |
+| **Temporal Decay** | Recent memories outrank stale ones. Score decays as `e^(−λΔt)` with Δt in **hours**; default λ is `0.01`, or set `GRAPHITE_DECAY_HALF_LIFE_DAYS` instead. |
 | **Frequency Suppression** | Stops the "broken record" problem. After a memory is injected N times in a session, it cools down for K turns. |
 | **Scoped Memory** | Memories are siloed into paths — `/projects/architect-cli`, `/personal/learning`. Mount and unmount scopes per session. Zero cross-contamination. |
 | **Context Virtualization** | "Private browsing" for AI. Start an inhibited session — all past memories are blocked, nothing is deleted. |
@@ -98,7 +92,7 @@ Graphite-Memory is a **Model Context Protocol server** written in Go that replac
 
 ### Prerequisites
 
-- **Go 1.22+**
+- **Go 1.26+** (see `go.mod`)
 - **Docker & Docker Compose** (for Neo4j + ChromaDB)
 - **[Ollama](https://ollama.ai)** with `llama3.1` pulled
 
@@ -114,6 +108,8 @@ make docker-up
 # Pull the embedding / extraction model
 ollama pull llama3.1
 ```
+
+Neo4j entities are keyed by `(scope, name)`. If you are upgrading from an older graph that only used global names, run `make docker-reset` once to recreate the Neo4j volume.
 
 ### 2. Build & Run
 
@@ -134,6 +130,23 @@ GRAPHITE_TRANSPORT=sse GRAPHITE_SSE_ADDR=:3100 ./bin/graphite-mem
 make test        # go test ./... -v -race
 make lint        # go vet
 ```
+
+### 4. Claude Desktop (stdio MCP)
+
+Point Claude Desktop at the built binary so it can spawn the server. On macOS, edit `~/Library/Application Support/Claude/claude_desktop_config.json` and merge something like:
+
+```json
+{
+  "mcpServers": {
+    "graphite-mem": {
+      "command": "/absolute/path/to/graphite-mem/bin/graphite-mem",
+      "cwd": "/absolute/path/to/graphite-mem"
+    }
+  }
+}
+```
+
+Use your real paths. Restart Claude Desktop. Keep `make docker-up` (Neo4j + ChromaDB) and Ollama running while you chat.
 
 <br>
 
@@ -291,7 +304,8 @@ All configuration is via environment variables with the `GRAPHITE_` prefix.
 | `GRAPHITE_NEO4J_PASS` | `graphite` | Neo4j password |
 | `GRAPHITE_OLLAMA_URL` | `http://localhost:11434` | Ollama endpoint |
 | `GRAPHITE_OLLAMA_MODEL` | `llama3.1` | Model for triple extraction + embedding |
-| `GRAPHITE_DECAY_LAMBDA` | `0.01` | Temporal decay rate (~3 day half-life) |
+| `GRAPHITE_DECAY_LAMBDA` | `0.01` | Decay constant λ (per hour): `score × e^(−λ·hours)`. Set to `0` to disable decay. Ignored if `GRAPHITE_DECAY_HALF_LIFE_DAYS` is set. |
+| `GRAPHITE_DECAY_HALF_LIFE_DAYS` | *(unset)* | If set to a positive number, λ is computed as `ln(2) / (days × 24)` and overrides `GRAPHITE_DECAY_LAMBDA`. |
 | `GRAPHITE_SUPPRESS_THRESHOLD` | `3` | Injection count before frequency cooldown |
 | `GRAPHITE_SUPPRESS_COOLDOWN` | `5` | Turns to hide a frequently injected fact |
 | `GRAPHITE_DEFAULT_SCOPE` | `/default` | Default memory scope path |
@@ -315,7 +329,7 @@ graphite-mem/
 │   ├── vault/               # Sessions, scopes, negative weights, inhibit
 │   └── storage/             # ChromaDB + Neo4j drivers with scope filtering
 ├── tools/                   # MCP tool definitions (9 tools)
-├── resources/               # MCP resource: memory://profile
+├── resources/               # MCP resource: memory://profile, readme-banner.svg
 ├── scripts/
 │   ├── docker-compose.yml   # Neo4j 5 + ChromaDB containers
 │   └── seed.cypher          # Optional seed data
@@ -373,7 +387,7 @@ make clean          # rm -rf bin/
 
 ---
 
-**Built with Go, powered by graphs and vectors.**
+<sub>Built with Go · Chroma · Neo4j · Ollama · MCP</sub>
 
 MIT License
 
