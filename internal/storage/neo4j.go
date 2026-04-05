@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -33,8 +34,8 @@ func (s *Neo4jStore) MergeTriples(ctx context.Context, memoryID string, scope st
 	for _, t := range triples {
 		cypher := `
 			MERGE (sc:Scope {path: $scope})
-			MERGE (s:Entity {name: $subject})
-			MERGE (o:Entity {name: $object})
+			MERGE (s:Entity {scope: $scope, name: $subject})
+			MERGE (o:Entity {scope: $scope, name: $object})
 			MERGE (s)-[r:REL {type: $predicate}]->(o)
 			SET r.memory_id = $memoryID, r.created_at = datetime()
 			MERGE (s)-[:BELONGS_TO]->(sc)
@@ -61,26 +62,20 @@ func (s *Neo4jStore) QueryByIntent(ctx context.Context, intent string, filter Sc
 
 	cypher := `
 		MATCH (s:Entity)-[r:REL]->(o:Entity)
+		MATCH (s)-[:BELONGS_TO]->(sc:Scope)
 		WHERE (r.type CONTAINS $intent OR s.name CONTAINS $intent OR o.name CONTAINS $intent)
+		AND ($crossScope OR size($scopes) = 0 OR sc.path IN $scopes)
 	`
 	params := map[string]any{
-		"intent": intent,
-		"limit":  limit,
-	}
-
-	if !filter.CrossScope && len(filter.Scopes) > 0 {
-		cypher += `
-		AND EXISTS {
-			MATCH (s)-[:BELONGS_TO]->(sc:Scope)
-			WHERE sc.path IN $scopes
-		}
-		`
-		params["scopes"] = filter.Scopes
+		"intent":      intent,
+		"limit":       limit,
+		"crossScope":  filter.CrossScope,
+		"scopes":      filter.Scopes,
 	}
 
 	cypher += `
 		RETURN s.name AS subject, r.type AS predicate, o.name AS object,
-		       r.memory_id AS memory_id, r.created_at AS created_at
+		       r.memory_id AS memory_id, r.created_at AS created_at, sc.path AS scope
 		LIMIT $limit
 	`
 
@@ -98,26 +93,20 @@ func (s *Neo4jStore) QueryRelated(ctx context.Context, subject string, filter Sc
 
 	cypher := `
 		MATCH (s:Entity)-[r:REL]->(o:Entity)
+		MATCH (s)-[:BELONGS_TO]->(sc:Scope)
 		WHERE s.name CONTAINS $subject OR o.name CONTAINS $subject
+		AND ($crossScope OR size($scopes) = 0 OR sc.path IN $scopes)
 	`
 	params := map[string]any{
-		"subject": subject,
-		"limit":   limit,
-	}
-
-	if !filter.CrossScope && len(filter.Scopes) > 0 {
-		cypher += `
-		AND EXISTS {
-			MATCH (s)-[:BELONGS_TO]->(sc:Scope)
-			WHERE sc.path IN $scopes
-		}
-		`
-		params["scopes"] = filter.Scopes
+		"subject":    subject,
+		"limit":      limit,
+		"crossScope": filter.CrossScope,
+		"scopes":     filter.Scopes,
 	}
 
 	cypher += `
 		RETURN s.name AS subject, r.type AS predicate, o.name AS object,
-		       r.memory_id AS memory_id, r.created_at AS created_at
+		       r.memory_id AS memory_id, r.created_at AS created_at, sc.path AS scope
 		LIMIT $limit
 	`
 
@@ -137,22 +126,41 @@ func collectRelatedMemories(ctx context.Context, result neo4j.ResultWithContext,
 		pred, _ := record.Get("predicate")
 		obj, _ := record.Get("object")
 		memID, _ := record.Get("memory_id")
+		createdRaw, _ := record.Get("created_at")
+		scopeRaw, _ := record.Get("scope")
 
 		path := fmt.Sprintf("%v -[%v]-> %v", subj, pred, obj)
 		scope := ""
-		if len(filter.Scopes) > 0 {
+		if s, ok := scopeRaw.(string); ok {
+			scope = s
+		} else if len(filter.Scopes) > 0 {
 			scope = filter.Scopes[0]
 		}
 
 		memories = append(memories, RelatedMemory{
-			MemoryID: fmt.Sprintf("%v", memID),
-			Text:     path,
-			Scope:    scope,
-			Path:     path,
-			Score:    1.0,
+			MemoryID:  fmt.Sprintf("%v", memID),
+			Text:      path,
+			Scope:     scope,
+			Path:      path,
+			Score:     1.0,
+			CreatedAt: neo4jTimeToGo(createdRaw),
 		})
 	}
 	return memories, result.Err()
+}
+
+func neo4jTimeToGo(v any) time.Time {
+	if v == nil {
+		return time.Time{}
+	}
+	switch t := v.(type) {
+	case time.Time:
+		return t
+	case neo4j.LocalDateTime:
+		return t.Time()
+	default:
+		return time.Time{}
+	}
 }
 
 func (s *Neo4jStore) Delete(ctx context.Context, memoryID string) error {
