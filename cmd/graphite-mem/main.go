@@ -56,8 +56,7 @@ func main() {
 		nil,
 	)
 
-	tools.SetStoreRefs(chromaStore, neo4jStore)
-	tools.RegisterAll(server, ing, gov, v, cfg)
+	tools.RegisterAll(server, ing, gov, v, cfg, chromaStore, neo4jStore)
 	resources.RegisterAll(server, neo4jStore, v)
 
 	switch cfg.Transport {
