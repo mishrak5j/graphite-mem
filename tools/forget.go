@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mishrak5j/graphite-mem/internal/storage"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,20 +20,15 @@ func registerForgetTool(server *mcp.Server, d *deps) {
 		Name:        "forget_memory",
 		Description: "Permanently delete a memory from both vector and graph stores.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input ForgetInput) (*mcp.CallToolResult, ForgetOutput, error) {
-		vector := d.ingestor // need access to stores -- use a helper
-		_ = vector
-
-		vs, ok := getVectorStore(d)
-		if !ok {
+		if d.vector == nil {
 			return errorResult("vector store unavailable"), ForgetOutput{}, nil
 		}
-		gs, ok2 := getGraphStore(d)
-		if !ok2 {
+		if d.graph == nil {
 			return errorResult("graph store unavailable"), ForgetOutput{}, nil
 		}
 
-		errV := vs.Delete(ctx, input.MemoryID)
-		errG := gs.Delete(ctx, input.MemoryID)
+		errV := d.vector.Delete(ctx, input.MemoryID)
+		errG := d.graph.Delete(ctx, input.MemoryID)
 
 		if errV != nil || errG != nil {
 			return errorResult(fmt.Sprintf("delete errors: vector=%v graph=%v", errV, errG)), ForgetOutput{}, nil
@@ -42,28 +36,4 @@ func registerForgetTool(server *mcp.Server, d *deps) {
 
 		return nil, ForgetOutput{Success: true}, nil
 	})
-}
-
-var (
-	vectorStoreRef storage.VectorStore
-	graphStoreRef  storage.GraphStore
-)
-
-func SetStoreRefs(vs storage.VectorStore, gs storage.GraphStore) {
-	vectorStoreRef = vs
-	graphStoreRef = gs
-}
-
-func getVectorStore(d *deps) (storage.VectorStore, bool) {
-	if vectorStoreRef != nil {
-		return vectorStoreRef, true
-	}
-	return nil, false
-}
-
-func getGraphStore(d *deps) (storage.GraphStore, bool) {
-	if graphStoreRef != nil {
-		return graphStoreRef, true
-	}
-	return nil, false
 }
