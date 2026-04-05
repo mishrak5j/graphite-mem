@@ -44,12 +44,12 @@ func registerStatusTool(server *mcp.Server, d *deps) {
 		}
 
 		var totalMem, nodes, edges int
-		if vs, ok := getVectorStore(d); ok {
-			totalMem, _ = vs.Count(ctx)
+		if d.vector != nil {
+			totalMem, _ = d.vector.Count(ctx)
 		}
-		if gs, ok := getGraphStore(d); ok {
-			nodes, _ = gs.NodeCount(ctx)
-			edges, _ = gs.EdgeCount(ctx)
+		if d.graph != nil {
+			nodes, _ = d.graph.NodeCount(ctx)
+			edges, _ = d.graph.EdgeCount(ctx)
 		}
 
 		return nil, StatusOutput{
