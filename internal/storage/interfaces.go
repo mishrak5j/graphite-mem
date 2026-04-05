@@ -31,11 +31,12 @@ type Triple struct {
 }
 
 type RelatedMemory struct {
-	MemoryID string
-	Text     string
-	Scope    string
-	Path     string
-	Score    float64
+	MemoryID  string
+	Text      string
+	Scope     string
+	Path      string
+	Score     float64
+	CreatedAt time.Time
 }
 
 type VectorStore interface {
