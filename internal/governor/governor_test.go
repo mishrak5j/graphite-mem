@@ -70,6 +70,18 @@ func TestFrequencySuppressorCrossSessions(t *testing.T) {
 	}
 }
 
+func TestLambdaFromHalfLifeDays(t *testing.T) {
+	// 3-day half-life → λ = ln(2) / (3 * 24) per hour
+	lambda := LambdaFromHalfLifeDays(3)
+	expected := math.Log(2) / (3 * 24)
+	if math.Abs(lambda-expected) > 1e-9 {
+		t.Fatalf("LambdaFromHalfLifeDays(3): got %v want %v", lambda, expected)
+	}
+	if LambdaFromHalfLifeDays(0) != 0 {
+		t.Fatal("LambdaFromHalfLifeDays(0) should be 0")
+	}
+}
+
 func TestDecayPreservesOrdering(t *testing.T) {
 	lambda := 0.01
 	recent := time.Now().Add(-1 * time.Hour)
