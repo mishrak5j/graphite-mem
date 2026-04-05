@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"os"
 	"strconv"
 )
@@ -40,7 +41,7 @@ func Load() *Config {
 		Neo4jPass:         envOrDefault("GRAPHITE_NEO4J_PASS", "graphite"),
 		OllamaURL:         envOrDefault("GRAPHITE_OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:       envOrDefault("GRAPHITE_OLLAMA_MODEL", "llama3.1"),
-		DecayLambda:       envOrDefaultFloat("GRAPHITE_DECAY_LAMBDA", 0.01),
+		DecayLambda:       loadDecayLambda(),
 		SuppressThreshold: envOrDefaultInt("GRAPHITE_SUPPRESS_THRESHOLD", 3),
 		SuppressCooldown:  envOrDefaultInt("GRAPHITE_SUPPRESS_COOLDOWN", 5),
 		DefaultScope:      envOrDefault("GRAPHITE_DEFAULT_SCOPE", "/default"),
@@ -71,4 +72,16 @@ func envOrDefaultFloat(key string, fallback float64) float64 {
 		}
 	}
 	return fallback
+}
+
+// loadDecayLambda returns λ (per hour) for score * exp(-λ·hours).
+// If GRAPHITE_DECAY_HALF_LIFE_DAYS is set and positive, λ = ln(2) / (days×24 hours).
+// Otherwise GRAPHITE_DECAY_LAMBDA is used (default 0.01). Set λ to 0 to disable decay.
+func loadDecayLambda() float64 {
+	if v := os.Getenv("GRAPHITE_DECAY_HALF_LIFE_DAYS"); v != "" {
+		if d, err := strconv.ParseFloat(v, 64); err == nil && d > 0 {
+			return math.Log(2) / (d * 24)
+		}
+	}
+	return envOrDefaultFloat("GRAPHITE_DECAY_LAMBDA", 0.01)
 }
