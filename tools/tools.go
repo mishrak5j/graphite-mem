@@ -4,6 +4,7 @@ import (
 	"github.com/mishrak5j/graphite-mem/internal/config"
 	"github.com/mishrak5j/graphite-mem/internal/governor"
 	"github.com/mishrak5j/graphite-mem/internal/ingestor"
+	"github.com/mishrak5j/graphite-mem/internal/storage"
 	"github.com/mishrak5j/graphite-mem/internal/vault"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -13,6 +14,8 @@ type deps struct {
 	governor *governor.Governor
 	vault    *vault.Vault
 	cfg      *config.Config
+	vector   storage.VectorStore
+	graph    storage.GraphStore
 }
 
 func RegisterAll(
@@ -21,12 +24,16 @@ func RegisterAll(
 	gov *governor.Governor,
 	v *vault.Vault,
 	cfg *config.Config,
+	vs storage.VectorStore,
+	gs storage.GraphStore,
 ) {
 	d := &deps{
 		ingestor: ing,
 		governor: gov,
 		vault:    v,
 		cfg:      cfg,
+		vector:   vs,
+		graph:    gs,
 	}
 
 	registerIngestTool(server, d)
