@@ -8,7 +8,7 @@ import (
 )
 
 type MountInput struct {
-	ScopePath string `json:"scope_path" jsonschema:"required,description=Scope path to mount (e.g. /projects/my-app)"`
+	ScopePath string `json:"scope_path" jsonschema:"Scope path to mount or unmount (e.g. /projects/my-app)"`
 }
 
 type MountOutput struct {
