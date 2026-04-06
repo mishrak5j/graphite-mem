@@ -100,17 +100,26 @@ Graphite Memory is a **Model Context Protocol server** in Go. It combines vector
 
 ### 1. Clone and start data stores
 
+Set a Neo4j password (no default in the repo). Copy [`.env.example`](.env.example) to `.env` in the repo root and set `GRAPHITE_NEO4J_PASS` to a strong value. Docker Compose and `graphite-mem` both use this variable.
+
 ```bash
 git clone https://github.com/mishrak5j/graphite-mem.git
 cd graphite-mem
+
+cp .env.example .env
+# Edit .env and set GRAPHITE_NEO4J_PASS
 
 make docker-up
 ollama pull llama3.1
 ```
 
+Docker Compose loads `.env` from the repo root when you run `make docker-up` from this directory.
+
 Neo4j nodes are keyed by `(scope, name)`. If you are upgrading from an older graph that used only global names, run `make docker-reset` once to recreate the Neo4j volume.
 
 ### 2. Build and run
+
+From the repo root, `graphite-mem` loads a `.env` file if present (same file as Docker Compose). Alternatively, export `GRAPHITE_NEO4J_PASS` in your shell.
 
 ```bash
 make build
@@ -307,7 +316,7 @@ Environment variables use the `GRAPHITE_` prefix.
 | `GRAPHITE_CHROMA_URL` | `http://localhost:8000` | Chroma HTTP API |
 | `GRAPHITE_NEO4J_URI` | `bolt://localhost:7687` | Neo4j Bolt URI |
 | `GRAPHITE_NEO4J_USER` | `neo4j` | Neo4j user |
-| `GRAPHITE_NEO4J_PASS` | `graphite` | Neo4j password |
+| `GRAPHITE_NEO4J_PASS` | *(required)* | Neo4j password; no default. Use the same value in `.env` for Docker Compose. |
 | `GRAPHITE_OLLAMA_URL` | `http://localhost:11434` | Ollama base URL |
 | `GRAPHITE_OLLAMA_MODEL` | `llama3.1` | Model for triples + embeddings |
 | `GRAPHITE_DECAY_LAMBDA` | `0.01` | λ per hour: `score × e^(−λ·hours)`. `0` disables. Ignored if half-life is set. |
@@ -325,6 +334,7 @@ Environment variables use the `GRAPHITE_` prefix.
 
 ```
 graphite-mem/
+├── .env.example            # Template for `GRAPHITE_NEO4J_PASS` (copy to `.env`)
 ├── cmd/graphite-mem/
 │   └── main.go              # Transport, wiring, server bootstrap
 ├── internal/

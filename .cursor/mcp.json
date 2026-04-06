@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "graphite-mem": {
+      "command": "${workspaceFolder}/bin/graphite-mem",
+      "cwd": "${workspaceFolder}",
+      "env": {}
+    }
+  }
+}

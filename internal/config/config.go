@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -31,14 +33,20 @@ type Config struct {
 	NegWeightTTL      int
 }
 
-func Load() *Config {
+// Load reads configuration from the environment. GRAPHITE_NEO4J_PASS is required (no default).
+func Load() (*Config, error) {
+	pass := strings.TrimSpace(os.Getenv("GRAPHITE_NEO4J_PASS"))
+	if pass == "" {
+		return nil, fmt.Errorf("GRAPHITE_NEO4J_PASS is required (set it to your Neo4j password, e.g. via a .env file in the repo root)")
+	}
+
 	return &Config{
 		Transport:         envOrDefault("GRAPHITE_TRANSPORT", "stdio"),
 		SSEAddr:           envOrDefault("GRAPHITE_SSE_ADDR", ":3100"),
 		ChromaURL:         envOrDefault("GRAPHITE_CHROMA_URL", "http://localhost:8000"),
 		Neo4jURI:          envOrDefault("GRAPHITE_NEO4J_URI", "bolt://localhost:7687"),
 		Neo4jUser:         envOrDefault("GRAPHITE_NEO4J_USER", "neo4j"),
-		Neo4jPass:         envOrDefault("GRAPHITE_NEO4J_PASS", "graphite"),
+		Neo4jPass:         pass,
 		OllamaURL:         envOrDefault("GRAPHITE_OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:       envOrDefault("GRAPHITE_OLLAMA_MODEL", "llama3.1"),
 		DecayLambda:       loadDecayLambda(),
@@ -46,7 +54,7 @@ func Load() *Config {
 		SuppressCooldown:  envOrDefaultInt("GRAPHITE_SUPPRESS_COOLDOWN", 5),
 		DefaultScope:      envOrDefault("GRAPHITE_DEFAULT_SCOPE", "/default"),
 		NegWeightTTL:      envOrDefaultInt("GRAPHITE_NEG_WEIGHT_DEFAULT_TTL", 50),
-	}
+	}, nil
 }
 
 func envOrDefault(key, fallback string) string {

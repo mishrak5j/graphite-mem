@@ -5,7 +5,8 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/graphite
+      # Same variable as graphite-mem (GRAPHITE_NEO4J_PASS); set in repo-root .env or environment.
+      NEO4J_AUTH: neo4j/${GRAPHITE_NEO4J_PASS:?GRAPHITE_NEO4J_PASS must be set for Neo4j (e.g. in .env)}
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data

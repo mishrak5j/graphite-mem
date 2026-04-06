@@ -16,11 +16,18 @@ import (
 	"github.com/mishrak5j/graphite-mem/resources"
 	"github.com/mishrak5j/graphite-mem/tools"
 
+	"github.com/joho/godotenv"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func main() {
-	cfg := config.Load()
+	// Optional repo-root .env (same file Docker Compose uses); ignore if missing.
+	_ = godotenv.Load()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
