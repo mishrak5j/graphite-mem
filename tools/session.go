@@ -7,8 +7,8 @@ import (
 )
 
 type SessionInput struct {
-	Inhibit     bool     `json:"inhibit,omitempty" jsonschema:"description=Start in clean-slate mode (no past memories returned)"`
-	MountScopes []string `json:"mount_scopes,omitempty" jsonschema:"description=Scope paths to mount into the new session"`
+	Inhibit     bool     `json:"inhibit,omitempty" jsonschema:"Start in clean-slate mode (no past memories returned)"`
+	MountScopes []string `json:"mount_scopes,omitempty" jsonschema:"Scope paths to mount into the new session"`
 }
 
 type SessionOutput struct {
