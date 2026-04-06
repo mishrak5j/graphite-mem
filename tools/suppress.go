@@ -8,9 +8,9 @@ import (
 )
 
 type SuppressInput struct {
-	Term   string  `json:"term" jsonschema:"required,description=Term to suppress (e.g. C++ or Python)"`
-	TTL    int     `json:"ttl,omitempty" jsonschema:"description=Number of messages before suppression expires (default 50)"`
-	Weight float64 `json:"weight,omitempty" jsonschema:"description=Score multiplier: 0.0=fully hidden 0.5=halved (default 0.0)"`
+	Term   string  `json:"term" jsonschema:"Term to suppress (e.g. C++ or Python)"`
+	TTL    int     `json:"ttl,omitempty" jsonschema:"Turns before suppression expires (default from config)"`
+	Weight float64 `json:"weight,omitempty" jsonschema:"Score multiplier: 0.0 fully hidden, 0.5 halved (default 0.0)"`
 }
 
 type SuppressOutput struct {
