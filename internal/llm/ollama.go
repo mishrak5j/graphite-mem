@@ -96,15 +96,49 @@ func (c *OllamaClient) ExtractTriples(ctx context.Context, text string) ([]Tripl
 
 func parseTriples(raw string) ([]Triple, error) {
 	raw = strings.TrimSpace(raw)
+	// Strip markdown code fences if present
+	if strings.HasPrefix(raw, "```") {
+		if i := strings.Index(raw, "\n"); i >= 0 {
+			raw = strings.TrimSpace(raw[i+1:])
+		}
+		if i := strings.LastIndex(raw, "```"); i > 0 {
+			raw = strings.TrimSpace(raw[:i])
+		}
+	}
 
-	start := strings.Index(raw, "[")
-	end := strings.LastIndex(raw, "]")
-	if start >= 0 && end > start {
-		raw = raw[start : end+1]
+	// Prefer structure by first byte — do not scan for '[' (can appear inside string values).
+	switch {
+	case strings.HasPrefix(raw, "{"):
+		var one Triple
+		if err := json.Unmarshal([]byte(raw), &one); err == nil {
+			if one.Subject == "" && one.Predicate == "" && one.Object == "" {
+				return nil, nil
+			}
+			return []Triple{one}, nil
+		}
+	case strings.HasPrefix(raw, "["):
+		var triples []Triple
+		if err := json.Unmarshal([]byte(raw), &triples); err == nil {
+			return triples, nil
+		}
+	default:
+		start := strings.Index(raw, "[")
+		end := strings.LastIndex(raw, "]")
+		if start >= 0 && end > start {
+			trim := raw[start : end+1]
+			var triples []Triple
+			if err := json.Unmarshal([]byte(trim), &triples); err == nil {
+				return triples, nil
+			}
+		}
 	}
 
 	var triples []Triple
 	if err := json.Unmarshal([]byte(raw), &triples); err != nil {
+		var one Triple
+		if err2 := json.Unmarshal([]byte(raw), &one); err2 == nil && (one.Subject != "" || one.Predicate != "" || one.Object != "") {
+			return []Triple{one}, nil
+		}
 		var wrapper map[string]json.RawMessage
 		if err2 := json.Unmarshal([]byte(raw), &wrapper); err2 == nil {
 			for _, v := range wrapper {
