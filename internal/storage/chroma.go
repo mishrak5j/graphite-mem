@@ -75,13 +75,18 @@ func (s *ChromaStore) Query(ctx context.Context, embedding []float32, topK int, 
 		return nil, fmt.Errorf("chroma query: %w", err)
 	}
 
+	return queryResultToScoredMemories(qr), nil
+}
+
+// queryResultToScoredMemories maps a Chroma query result to ScoredMemory rows (first result group only).
+func queryResultToScoredMemories(qr chroma.QueryResult) []ScoredMemory {
 	idGroups := qr.GetIDGroups()
 	docGroups := qr.GetDocumentsGroups()
 	distGroups := qr.GetDistancesGroups()
 	metaGroups := qr.GetMetadatasGroups()
 
 	if len(idGroups) == 0 || len(idGroups[0]) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	ids := idGroups[0]
@@ -116,7 +121,7 @@ func (s *ChromaStore) Query(ctx context.Context, embedding []float32, topK int, 
 		results = append(results, mem)
 	}
 
-	return results, nil
+	return results
 }
 
 func (s *ChromaStore) Delete(ctx context.Context, id string) error {
