@@ -148,6 +148,16 @@ Point Claude Desktop at the built binary so it can spawn the server. On macOS, e
 
 Use your real paths. Restart Claude Desktop. Keep `make docker-up` (Neo4j + ChromaDB) and Ollama running while you chat.
 
+### 5. Cursor
+
+This repo includes [`.cursor/mcp.json`](.cursor/mcp.json), which runs `bin/graphite-mem` via stdio. Before using it:
+
+1. `make build`
+2. `make docker-up` and ensure Ollama has your model (e.g. `ollama pull llama3.1`)
+3. **Reload MCP** in Cursor (Command Palette → “MCP: Restart” or restart Cursor) so it picks up the config
+
+Then open **Agent** or **Chat** with MCP tools enabled — you should see tools such as `ingest_memory` and `recall_memory`. If `${workspaceFolder}` is not expanded on your build, set `command` in `.cursor/mcp.json` to the absolute path of `bin/graphite-mem`.
+
 <br>
 
 ## Data Flow
