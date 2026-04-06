@@ -9,10 +9,10 @@ import (
 )
 
 type RecallInput struct {
-	Query      string `json:"query" jsonschema:"required,description=Search query for memory recall"`
-	Intent     string `json:"intent,omitempty" jsonschema:"description=Intent filter for graph-based retrieval"`
-	TopK       int    `json:"top_k,omitempty" jsonschema:"description=Max memories to return (default 5)"`
-	CrossScope bool   `json:"cross_scope,omitempty" jsonschema:"description=Search all scopes regardless of mount state"`
+	Query      string `json:"query" jsonschema:"Search query for memory recall"`
+	Intent     string `json:"intent,omitempty" jsonschema:"Intent filter for graph-based retrieval"`
+	TopK       int    `json:"top_k,omitempty" jsonschema:"Max memories to return (default 5)"`
+	CrossScope bool   `json:"cross_scope,omitempty" jsonschema:"Search all scopes regardless of mount state"`
 }
 
 type RecallOutput struct {
