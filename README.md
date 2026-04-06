@@ -50,7 +50,7 @@ Graphite Memory is a **Model Context Protocol server** in Go. It combines vector
 ```
                     ┌─────────────────────────┐
                     │      LLM  clients       │
-                    │  Gemini · ChatGPT · Claude│
+                    │Gemini · ChatGPT · Claude│
                     └───────────┬─────────────┘
                                 │
                           MCP (stdio / HTTP)
@@ -65,23 +65,23 @@ Graphite Memory is a **Model Context Protocol server** in Go. It combines vector
 │   │  mount_scope      unmount_scope     list_scopes            │ │
 │   └──────────────┬──────────────────────┬──────────────────────┘ │
 │                  │                      │                        │
-│   ┌──────────────▼──────┐  ┌────────────▼───────────────┐       │
+│   ┌──────────────▼──────┐  ┌────────────▼───────────────┐        │
 │   │    Memory  vault    │  │        Governor             │       │
 │   │                     │  │                             │       │
 │   │  Session manager    │  │  Parallel retrieval (WG)    │       │
 │   │  Scope registry     │  │  Temporal decay  e^(−λt)    │       │
 │   │  Inhibit toggle     │  │  Frequency suppressor       │       │
 │   │  Negative weights   │  │  Graph boost  (×1.5)        │       │
-│   └─────────────────────┘  └──────┬──────────┬──────────┘       │
+│   └─────────────────────┘  └──────┬──────────┬──────────┘        │
 │                                   │          │                   │
-│                          ┌────────▼──┐  ┌────▼────────┐         │
-│                          │ Chroma    │  │   Neo4j     │         │
-│                          │ (vectors) │  │   (graph)   │         │
-│                          └───────────┘  └─────────────┘         │
+│                          ┌────────▼──┐  ┌────▼────────┐          │
+│                          │ Chroma    │  │   Neo4j     │          │
+│                          │ (vectors) │  │   (graph)   │          │
+│                          └───────────┘  └─────────────┘          │
 │                                                                  │
 │   ┌────────────────────────────────────────────────────────────┐ │
-│   │         Ollama (e.g. Llama 3.1)                              │ │
-│   │         Triple extraction · embedding generation             │ │
+│   │         Ollama (e.g. Llama 3.1)                            │ │
+│   │         Triple extraction · embedding generation           │ │
 │   └────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │                        Graphite Memory server                    │
