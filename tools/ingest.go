@@ -9,9 +9,9 @@ import (
 )
 
 type IngestInput struct {
-	Text     string         `json:"text" jsonschema:"required,description=The text content to store as a memory"`
-	Scope    string         `json:"scope,omitempty" jsonschema:"description=Scope path (e.g. /projects/my-app). Uses session default if omitted"`
-	Metadata map[string]any `json:"metadata,omitempty" jsonschema:"description=Optional metadata (intent, source, tags)"`
+	Text     string         `json:"text" jsonschema:"The text content to store as a memory"`
+	Scope    string         `json:"scope,omitempty" jsonschema:"Scope path (e.g. /projects/my-app). Uses session default if omitted"`
+	Metadata map[string]any `json:"metadata,omitempty" jsonschema:"Optional metadata (intent, source, tags)"`
 }
 
 type IngestOutput struct {
