@@ -8,7 +8,7 @@ import (
 )
 
 type ForgetInput struct {
-	MemoryID string `json:"memory_id" jsonschema:"required,description=ID of the memory to permanently delete"`
+	MemoryID string `json:"memory_id" jsonschema:"UUID of the memory to permanently delete"`
 }
 
 type ForgetOutput struct {
