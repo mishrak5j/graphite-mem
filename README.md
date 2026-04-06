@@ -66,12 +66,12 @@ Graphite Memory is a **Model Context Protocol server** in Go. It combines vector
 │   └──────────────┬──────────────────────┬──────────────────────┘ │
 │                  │                      │                        │
 │   ┌──────────────▼──────┐  ┌────────────▼───────────────┐        │
-│   │    Memory  vault    │  │        Governor             │       │
-│   │                     │  │                             │       │
-│   │  Session manager    │  │  Parallel retrieval (WG)    │       │
-│   │  Scope registry     │  │  Temporal decay  e^(−λt)    │       │
-│   │  Inhibit toggle     │  │  Frequency suppressor       │       │
-│   │  Negative weights   │  │  Graph boost  (×1.5)        │       │
+│   │    Memory  vault    │  │        Governor            │        │
+│   │                     │  │                            │        │
+│   │  Session manager    │  │  Parallel retrieval (WG)   │        │
+│   │  Scope registry     │  │  Temporal decay  e^(−λt)   │        │
+│   │  Inhibit toggle     │  │  Frequency suppressor      │        │
+│   │  Negative weights   │  │  Graph boost  (×1.5)       │        │
 │   └─────────────────────┘  └──────┬──────────┬──────────┘        │
 │                                   │          │                   │
 │                          ┌────────▼──┐  ┌────▼────────┐          │
