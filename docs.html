@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphite Memory — Hybrid Graph + Vector Memory for LLMs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0f1419;
+            --bg-darker: #0a0d11;
+            --accent-primary: #7c8b9e;
+            --accent-secondary: #9ca8b8;
+            --accent-tertiary: #5a6a7d;
+            --accent-highlight: #b8c5d6;
+            --graphite: #4a5568;
+            --text-primary: #e4e7eb;
+            --text-secondary: #9ca3af;
+            --card-bg: rgba(28, 32, 40, 0.7);
+            --border-color: rgba(124, 139, 158, 0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(124, 139, 158, 0.03) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(90, 106, 125, 0.05) 0%, transparent 50%);
+            animation: drift 20s ease-in-out infinite;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-50px, -50px); }
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 1.5rem 0;
+            background: rgba(10, 14, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        header.scrolled {
+            padding: 1rem 0;
+            background: rgba(10, 14, 39, 0.95);
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-primary);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 6rem 2rem 4rem;
+        }
+
+        .hero-content h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .hero-content .tagline {
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            animation: fadeInUp 0.8s ease 0.2s backwards;
+        }
+
+        .hero-content .subtitle {
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease 0.4s backwards;
+        }
+
+        .tech-stack {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease 0.6s backwards;
+        }
+
+        .tech-badge {
+            padding: 0.5rem 1.2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .tech-badge:hover {
+            border-color: var(--accent-highlight);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(124, 139, 158, 0.15);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.8s ease 0.8s backwards;
+        }
+
+        .btn {
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--graphite), var(--accent-primary));
+            color: white;
+            box-shadow: 0 4px 15px rgba(74, 85, 104, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(74, 85, 104, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--accent-highlight);
+            border: 2px solid var(--accent-primary);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(124, 139, 158, 0.1);
+            transform: translateY(-2px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Section Styles */
+        section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 6rem 2rem;
+        }
+
+        .section-title {
+            font-size: clamp(2rem, 4vw, 3rem);
+            text-align: center;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 4rem;
+            font-size: 1.2rem;
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-highlight);
+            box-shadow: 0 10px 30px rgba(124, 139, 158, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent-primary);
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 3rem;
+            margin: 3rem 0;
+            overflow-x: auto;
+        }
+
+        .architecture pre {
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .code-block code {
+            color: var(--accent-tertiary);
+        }
+
+        /* Quick Start Steps */
+        .steps {
+            display: grid;
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .step {
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .step:hover {
+            border-color: var(--accent-highlight);
+            transform: translateX(10px);
+        }
+
+        .step-number {
+            flex-shrink: 0;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--graphite), var(--accent-primary));
+            border-radius: 50%;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .step-content h3 {
+            margin-bottom: 0.5rem;
+            color: var(--accent-primary);
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+        }
+
+        /* Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .comparison-table th {
+            background: rgba(124, 139, 158, 0.1);
+            color: var(--accent-highlight);
+            font-weight: 600;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(124, 139, 158, 0.05);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-darker);
+            border-top: 1px solid var(--border-color);
+            padding: 3rem 2rem;
+            text-align: center;
+            margin-top: 6rem;
+        }
+
+        footer p {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        footer a {
+            color: var(--accent-highlight);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        footer a:hover {
+            color: var(--accent-secondary);
+        }
+
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+
+        .scroll-indicator:hover {
+            opacity: 1;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-10px); }
+            60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .step {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .step-number {
+                margin: 0 auto;
+            }
+        }
+
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <header id="header">
+        <nav>
+            <div class="logo">⚡ Graphite</div>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#quickstart">Quick Start</a></li>
+                <li><a href="#tools">MCP Tools</a></li>
+                <li><a href="https://github.com/mishrak5j/graphite-mem" target="_blank">GitHub</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Graphite Memory</h1>
+                <p class="tagline">Hybrid Graph + Vector Memory for LLMs</p>
+                <p class="subtitle">Memory that behaves like memory—not a flat vector dump</p>
+                
+                <div class="tech-stack">
+                    <span class="tech-badge">Go</span>
+                    <span class="tech-badge">MCP</span>
+                    <span class="tech-badge">Neo4j</span>
+                    <span class="tech-badge">Chroma</span>
+                    <span class="tech-badge">Ollama</span>
+                </div>
+
+                <div class="cta-buttons">
+                    <a href="#quickstart" class="btn btn-primary">Get Started</a>
+                    <a href="https://github.com/mishrak5j/graphite-mem" class="btn btn-secondary" target="_blank">View on GitHub</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- The Problem -->
+        <section id="problem">
+            <h2 class="section-title">The Problem</h2>
+            <p class="section-subtitle">Most LLM "memory" is broken</p>
+            
+            <div class="architecture">
+                <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.8;">
+                    Everything competes on similarity. Important context repeats like a broken record. 
+                    The system has no notion of <strong style="color: var(--accent-primary)">why</strong> a fact mattered—only that it was similar to the query.
+                    <br><br>
+                    Traditional vector-only RAG treats all memories equally, with no understanding of relationships, 
+                    temporal relevance, or contextual importance.
+                </p>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section id="features">
+            <h2 class="section-title">Why Graphite?</h2>
+            <p class="section-subtitle">Memory with structure, context, and intelligence</p>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔗</div>
+                    <h3>Graph + Vector Fusion</h3>
+                    <p>Chroma finds <em>what</em> is similar; Neo4j carries <em>how</em> ideas connect. Items in both stores get a 1.5× score boost.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⏰</div>
+                    <h3>Temporal Decay</h3>
+                    <p>Newer memories rank higher. Score scaled by e<sup>−λΔt</sup> with Δt in hours. Configurable λ or half-life in days.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔇</div>
+                    <h3>Frequency Suppression</h3>
+                    <p>After N injections in a session, memories cool down for K turns so the same content doesn't dominate.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📁</div>
+                    <h3>Scoped Memory</h3>
+                    <p>Path-based scopes like /projects/architect-cli isolate context. Mount and unmount scopes per session.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎭</div>
+                    <h3>Context Virtualization</h3>
+                    <p>Start inhibited sessions to block past memories without deleting them. Private-browsing mode for AI.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⛔</div>
+                    <h3>Negative Weighting</h3>
+                    <p>Temporarily down-rank topics ("not C++ right now") with TTL decay. Suppress without deleting.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Architecture -->
+        <section id="architecture">
+            <h2 class="section-title">Architecture</h2>
+            <p class="section-subtitle">Parallel vector + graph retrieval with intelligent ranking</p>
+            
+            <div class="architecture">
+                <pre>
+                    ┌─────────────────────────┐
+                    │      LLM  clients       │
+                    │Gemini · ChatGPT · Claude│
+                    └───────────┬─────────────┘
+                                │
+                          MCP (stdio / HTTP)
+                                │
+┌───────────────────────────────▼──────────────────────────────────┐
+│                                                                  │
+│   ┌────────────────────────────────────────────────────────────┐ │
+│   │                      MCP  tools                            │ │
+│   │                                                            │ │
+│   │  ingest_memory    recall_memory     forget_memory          │ │
+│   │  suppress_topic   new_session       memory_status          │ │
+│   │  mount_scope      unmount_scope     list_scopes            │ │
+│   └──────────────┬──────────────────────┬──────────────────────┘ │
+│                  │                      │                        │
+│   ┌──────────────▼──────┐  ┌────────────▼───────────────┐        │
+│   │    Memory  vault    │  │        Governor            │        │
+│   │                     │  │                            │        │
+│   │  Session manager    │  │  Parallel retrieval (WG)   │        │
+│   │  Scope registry     │  │  Temporal decay  e^(−λt)   │        │
+│   │  Inhibit toggle     │  │  Frequency suppressor      │        │
+│   │  Negative weights   │  │  Graph boost  (×1.5)       │        │
+│   └─────────────────────┘  └──────┬──────────┬──────────┘        │
+│                                   │          │                   │
+│                          ┌────────▼──┐  ┌────▼────────┐          │
+│                          │ Chroma    │  │   Neo4j     │          │
+│                          │ (vectors) │  │   (graph)   │          │
+│                          └───────────┘  └─────────────┘          │
+│                                                                  │
+│   ┌────────────────────────────────────────────────────────────┐ │
+│   │         Ollama (e.g. Llama 3.1)                            │ │
+│   │         Triple extraction · embedding generation           │ │
+│   └────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│                        Graphite Memory server                    │
+└──────────────────────────────────────────────────────────────────┘
+                </pre>
+            </div>
+
+            <div style="margin-top: 3rem;">
+                <h3 style="color: var(--accent-primary); margin-bottom: 1.5rem; font-size: 1.8rem;">Recall Pipeline</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th>What Happens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>1. Parallel Retrieval</strong></td>
+                            <td>Chroma vector search + Neo4j graph traversal (concurrent goroutines)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>2. Graph Boost</strong></td>
+                            <td>Items in both stores get 1.5× score multiplier</td>
+                        </tr>
+                        <tr>
+                            <td><strong>3. Temporal Decay</strong></td>
+                            <td>score × e<sup>−λ·hours</sup> (newer memories rank higher)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>4. Frequency Suppression</strong></td>
+                            <td>Cool down over-injected memories for K turns</td>
+                        </tr>
+                        <tr>
+                            <td><strong>5. Negative Weights</strong></td>
+                            <td>Apply topic suppressions with score multipliers</td>
+                        </tr>
+                        <tr>
+                            <td><strong>6. Rank & Return</strong></td>
+                            <td>Sort by final score, return top K</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section id="quickstart">
+            <h2 class="section-title">Quick Start</h2>
+            <p class="section-subtitle">Get Graphite running in 3 steps</p>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Clone and Configure</h3>
+                        <p>Set up your Neo4j password and start the data stores</p>
+                        <div class="code-block">
+<pre><code>git clone https://github.com/mishrak5j/graphite-mem.git
+cd graphite-mem
+
+cp .env.example .env
+# Edit .env and set GRAPHITE_NEO4J_PASS
+
+make docker-up
+ollama pull llama3.1</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Build and Run</h3>
+                        <p>Compile the server and start it</p>
+                        <div class="code-block">
+<pre><code>make build
+
+# Default: stdio (for MCP clients)
+./bin/graphite-mem
+
+# Optional: HTTP/SSE on port 3100
+GRAPHITE_TRANSPORT=sse GRAPHITE_SSE_ADDR=:3100 ./bin/graphite-mem</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Connect Your Client</h3>
+                        <p>Add to Claude Desktop, Cursor, or any MCP client</p>
+                        <div class="code-block">
+<pre><code>{
+  "mcpServers": {
+    "graphite-mem": {
+      "command": "/path/to/graphite-mem/bin/graphite-mem",
+      "cwd": "/path/to/graphite-mem"
+    }
+  }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MCP Tools -->
+        <section id="tools">
+            <h2 class="section-title">MCP Tools</h2>
+            <p class="section-subtitle">Full API surface for memory management</p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>ingest_memory</h3>
+                    <p>Store a memory with automatic triple extraction and embedding. Tags with scope for multi-tenant retrieval.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>recall_memory</h3>
+                    <p>Hybrid graph-vector search with temporal decay and scope filtering. Supports cross-scope references.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>new_session</h3>
+                    <p>Start a fresh session. Optionally inhibit past memories for clean-slate mode or pre-mount scopes.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>suppress_topic</h3>
+                    <p>Temporarily suppress a topic from recall. Configurable TTL and weight (0.0 = fully hidden).</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>mount_scope / unmount_scope</h3>
+                    <p>Mount or unmount memory scopes. Only mounted scopes are searched during recall.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>memory_status</h3>
+                    <p>Full diagnostic view: session state, mounted scopes, active suppressions, store stats.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>forget_memory</h3>
+                    <p>Permanently delete a memory from both vector and graph stores.</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>list_scopes</h3>
+                    <p>List all available scopes with mount status and memory counts.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 3rem;">
+                <h3 style="color: var(--accent-primary); margin-bottom: 1.5rem; font-size: 1.8rem;">MCP Resource</h3>
+                <div class="feature-card">
+                    <h3>memory://profile</h3>
+                    <p>Plain-text profile synthesized from the knowledge graph: session ID, mounted scopes, and graph-derived relationships.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration -->
+        <section id="config">
+            <h2 class="section-title">Configuration</h2>
+            <p class="section-subtitle">Customize Graphite with environment variables</p>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GRAPHITE_TRANSPORT</code></td>
+                        <td>stdio</td>
+                        <td>stdio or sse</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_NEO4J_PASS</code></td>
+                        <td><em>(required)</em></td>
+                        <td>Neo4j password</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_DECAY_LAMBDA</code></td>
+                        <td>0.01</td>
+                        <td>λ per hour (0 disables decay)</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_DECAY_HALF_LIFE_DAYS</code></td>
+                        <td><em>(unset)</em></td>
+                        <td>If set, λ = ln(2) / (days × 24)</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_SUPPRESS_THRESHOLD</code></td>
+                        <td>3</td>
+                        <td>Injections before cooldown</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_SUPPRESS_COOLDOWN</code></td>
+                        <td>5</td>
+                        <td>Turns to hide over-injected memory</td>
+                    </tr>
+                    <tr>
+                        <td><code>GRAPHITE_OLLAMA_MODEL</code></td>
+                        <td>llama3.1</td>
+                        <td>Model for triples + embeddings</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Why Graphite -->
+        <section>
+            <h2 class="section-title">Design Philosophy</h2>
+            <p class="section-subtitle">Why these choices matter</p>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Rationale</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Go</strong></td>
+                        <td>Goroutines fit parallel vector + graph queries; keeps latency predictable for MCP clients</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Graph + Vector</strong></td>
+                        <td>Vectors approximate similarity; graphs capture relationships. Together they read like structured recall, not keyword RAG</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Scopes</strong></td>
+                        <td>Path-based scopes avoid cross-project bleed without re-indexing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Frequency Suppression</strong></td>
+                        <td>High-similarity chunks shouldn't dominate every turn; cooldown brings them back after a pause</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Negative Weights</strong></td>
+                        <td>Short-lived "don't mention X" without deleting stored memories</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <p>Built with ⚡ by <a href="https://github.com/mishrak5j" target="_blank">kshitij</a></p>
+        <p>
+            <a href="https://github.com/mishrak5j/graphite-mem" target="_blank">GitHub</a> · 
+            <a href="https://github.com/mishrak5j/graphite-mem/issues" target="_blank">Issues</a> · 
+            MIT License
+        </p>
+    </footer>
+
+    <div class="scroll-indicator" id="scrollIndicator">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+            <path d="M15 5L15 20M15 20L10 15M15 20L20 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-highlight);"/>
+        </svg>
+    </div>
+
+    <script>
+        // Header scroll effect
+        const header = document.getElementById('header');
+        const scrollIndicator = document.getElementById('scrollIndicator');
+
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 100) {
+                header.classList.add('scrolled');
+                scrollIndicator.style.opacity = '0';
+            } else {
+                header.classList.remove('scrolled');
+                scrollIndicator.style.opacity = '0.6';
+            }
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .step, section').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
